@@ -1,4 +1,4 @@
-// ===== ROLETA PROFISSIONAL COM EFEITO DE PARADA ULTRA FLUIDO =====
+// ===== ROLETA FUNCIONAL COM GIRO E PARADA PROFISSIONAL ULTRA MELHORADA =====
 
 // Estados da roleta
 const ESTADOS_ROLETA = {
@@ -22,28 +22,29 @@ let gameState = {
     autoStopTimeout: null,
     anguloFinal: 0, // Ângulo onde a roleta deve parar
     desacelerando: false,
-    // Parâmetros otimizados para efeito ultra profissional
-    velocidadeInicial: 25, // Velocidade inicial mais alta para melhor efeito
-    velocidadeMinima: 0.05, // Velocidade mínima mais baixa para parada mais suave
+    // Parâmetros melhorados para controle de desaceleração ultra suave
+    velocidadeInicial: 15, // Reduzida para melhor controle
+    velocidadeMinima: 0.05,
+    fatorDesaceleracao: 0.985,
     tempoDesaceleracao: 0,
-    duracaoDesaceleracao: 3500, // 3.5 segundos para desaceleração ultra suave
+    duracaoDesaceleracao: 3000, // 3 segundos para desaceleração mais suave
     anguloInicialDesaceleracao: 0,
     distanciaTotalDesaceleracao: 0,
-    // Novos parâmetros para precisão máxima
-    margemErroAngulo: 1, // Margem de erro reduzida para 1 grau
+    // Novos parâmetros para precisão e realismo
+    margemErroAngulo: 1, // Margem de erro em graus para parada precisa
     ajusteFinalAtivo: false,
-    // Parâmetros para efeitos visuais avançados
-    intensidadeBrilho: 1,
-    filtroAtual: '',
-    // Controle de momentum para parada mais realista
-    momentumAtual: 0,
-    resistenciaBase: 0.985, // Resistência natural da roleta
-    resistenciaParada: 0.92, // Resistência adicional quando parando
-    // Parâmetros para oscilação final (efeito de mola)
-    oscilacoesFinais: true,
-    amplitudeOscilacao: 0.8, // Amplitude da oscilação em graus
-    frequenciaOscilacao: 8, // Frequência da oscilação
-    tempoOscilacao: 800 // Duração da oscilação em ms
+    // Parâmetros para overshoot/rebound natural
+    overshootAtivo: false,
+    anguloOvershoot: 0,
+    intensidadeOvershoot: 0.3, // Intensidade do overshoot (0-1)
+    duracaoOvershoot: 800, // Duração do efeito de overshoot
+    tempoInicioOvershoot: 0,
+    // Parâmetros para micro-oscilações finais
+    microOscilacaoAtiva: false,
+    amplitudeMicroOscilacao: 0.5,
+    frequenciaMicroOscilacao: 8,
+    tempoInicioMicroOscilacao: 0,
+    duracaoMicroOscilacao: 1200
 };
 
 // Elementos DOM
@@ -81,43 +82,15 @@ const setoresRoleta = [
     { inicio: 315, fim: 360, cor: 'cinza', premio: premiosPossiveis[0] }      // 315-360°
 ];
 
-// ===== FUNÇÕES DE EASING PROFISSIONAIS =====
-
-// Easing cúbico ultra suave para desaceleração principal
-function easeOutCubic(t) {
-    return 1 - Math.pow(1 - t, 3);
-}
-
-// Easing quártico para transições mais dramáticas
-function easeOutQuart(t) {
-    return 1 - Math.pow(1 - t, 4);
-}
-
-// Easing exponencial para parada final
-function easeOutExpo(t) {
-    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-}
-
-// Easing personalizado para efeito de mola (bounce suave)
-function easeOutElastic(t) {
-    const c4 = (2 * Math.PI) / 3;
-    return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
-}
-
-// Função de interpolação suave para transições
-function lerp(start, end, factor) {
-    return start + (end - start) * factor;
-}
-
 // ===== FUNÇÕES PRINCIPAIS =====
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🎰 RoletaWin - Iniciando sistema ultra profissional...');
+    console.log('🎰 RoletaWin - Iniciando sistema profissional ultra melhorado...');
     inicializarElementos();
     inicializarEventListeners();
     atualizarInterface();
-    console.log('✅ Sistema inicializado com efeitos profissionais!');
+    console.log('✅ Sistema inicializado com sucesso!');
 });
 
 // Inicializar elementos DOM
@@ -171,7 +144,7 @@ function inicializarEventListeners() {
 
 // Iniciar giro
 function iniciarGiro() {
-    console.log('🎯 Iniciando giro ultra profissional...');
+    console.log('🎯 Iniciando giro profissional ultra melhorado...');
     
     if (gameState.estadoRoleta !== ESTADOS_ROLETA.IDLE || gameState.girosRestantes <= 0) {
         console.log('❌ Não é possível girar agora. Estado:', gameState.estadoRoleta, 'Giros:', gameState.girosRestantes);
@@ -181,7 +154,7 @@ function iniciarGiro() {
     // Calcular ângulo final baseado no prêmio sorteado
     const premioSorteado = sortearPremio();
     const setorEscolhido = encontrarSetorPorPremio(premioSorteado);
-    gameState.anguloFinal = calcularAnguloFinalProfissional(setorEscolhido);
+    gameState.anguloFinal = calcularAnguloFinalMelhorado(setorEscolhido);
     
     console.log('🎲 Prêmio sorteado:', premioSorteado);
     console.log('🎯 Setor escolhido:', setorEscolhido);
@@ -196,8 +169,8 @@ function iniciarGiro() {
     gameState.desacelerando = false;
     gameState.tempoDesaceleracao = 0;
     gameState.ajusteFinalAtivo = false;
-    gameState.momentumAtual = gameState.velocidadeInicial;
-    gameState.intensidadeBrilho = 1;
+    gameState.overshootAtivo = false;
+    gameState.microOscilacaoAtiva = false;
     
     console.log('✅ Estado atualizado para SPINNING');
     
@@ -219,8 +192,8 @@ function iniciarGiro() {
     
     mostrarToast('🎰 A roleta está girando! Aguarde para poder parar...', 'info');
     
-    // Iniciar animação da roleta ultra profissional
-    iniciarAnimacaoUltraProfissional();
+    // Iniciar animação da roleta
+    iniciarAnimacaoRoletaUltraMelhorada();
     
     // Habilitar botão parar após tempo mínimo
     setTimeout(() => {
@@ -270,20 +243,20 @@ function encontrarSetorPorPremio(premio) {
     return setoresValidos[indiceAleatorio];
 }
 
-// ULTRA MELHORADO: Calcular ângulo final com precisão máxima
-function calcularAnguloFinalProfissional(setor) {
-    // Calcular o centro do setor para máxima precisão
+// MELHORADO: Calcular ângulo final com melhor precisão
+function calcularAnguloFinalMelhorado(setor) {
+    // Calcular o centro do setor para maior precisão
     const centroSetor = setor.inicio + (setor.fim - setor.inicio) / 2;
     
-    // Adicionar variação mínima para naturalidade (±3 graus)
+    // Adicionar uma pequena variação aleatória para naturalidade (±3 graus)
     const variacao = (Math.random() - 0.5) * 6;
     const anguloNoSetor = centroSetor + variacao;
     
-    // Garantir que o ângulo esteja dentro do setor com margem de segurança
-    const anguloFinalSetor = Math.max(setor.inicio + 3, Math.min(setor.fim - 3, anguloNoSetor));
+    // Garantir que o ângulo esteja dentro do setor
+    const anguloFinalSetor = Math.max(setor.inicio + 2, Math.min(setor.fim - 2, anguloNoSetor));
     
-    // Adicionar voltas completas (4-5 voltas para efeito mais dramático)
-    const voltasCompletas = 4 + Math.random(); // 4-5 voltas
+    // Adicionar voltas completas (3-4 voltas para consistência)
+    const voltasCompletas = 3 + Math.random(); // 3-4 voltas
     const anguloTotal = (voltasCompletas * 360) + anguloFinalSetor;
     
     console.log(`🎯 Setor: ${setor.inicio}-${setor.fim}°, Centro: ${centroSetor}°, Final: ${anguloFinalSetor}°`);
@@ -291,14 +264,48 @@ function calcularAnguloFinalProfissional(setor) {
     return anguloTotal;
 }
 
-// ===== ANIMAÇÃO ULTRA PROFISSIONAL COM EFEITOS AVANÇADOS =====
+// ===== ANIMAÇÃO ULTRA MELHORADA COM DESACELERAÇÃO PROFISSIONAL =====
+
+// Função de easing personalizada para desaceleração ultra suave
+function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+}
+
+// Função de easing exponencial ultra suave
+function easeOutQuint(t) {
+    return 1 - Math.pow(1 - t, 5);
+}
+
+// NOVA: Função de easing combinada para máximo realismo
+function easeOutCombined(t) {
+    // Combina cubic e exponencial para transição ultra suave
+    const cubic = easeOutCubic(t);
+    const quint = easeOutQuint(t);
+    return (cubic * 0.7) + (quint * 0.3);
+}
+
+// NOVA: Função para calcular overshoot natural
+function calcularOvershoot(t, intensidade) {
+    // Simula o efeito de "passar um pouco" e voltar
+    const overshoot = Math.sin(t * Math.PI) * intensidade * (1 - t);
+    return overshoot;
+}
+
+// NOVA: Função para micro-oscilações finais
+function calcularMicroOscilacao(t, amplitude, frequencia) {
+    // Pequenas oscilações que diminuem com o tempo
+    const decaimento = Math.exp(-t * 3); // Decaimento exponencial
+    const oscilacao = Math.sin(t * frequencia * Math.PI * 2) * amplitude * decaimento;
+    return oscilacao;
+}
 
 // ULTRA MELHORADO: Animação contínua da roleta com controle de precisão máxima
-function iniciarAnimacaoUltraProfissional() {
-    console.log('🔄 Iniciando animação ultra profissional da roleta');
+function iniciarAnimacaoRoletaUltraMelhorada() {
+    console.log('🔄 Iniciando animação profissional ULTRA melhorada da roleta');
     
     function animar() {
-        if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING || gameState.estadoRoleta === ESTADOS_ROLETA.STOPPING) {
+        if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING || 
+            gameState.estadoRoleta === ESTADOS_ROLETA.STOPPING) {
             
             if (gameState.estadoRoleta === ESTADOS_ROLETA.STOPPING && !gameState.desacelerando) {
                 // Iniciar desaceleração ultra suave
@@ -322,11 +329,16 @@ function iniciarAnimacaoUltraProfissional() {
                 const progresso = Math.min(tempoDecorrido / gameState.duracaoDesaceleracao, 1);
                 
                 if (progresso >= 1) {
-                    // Desaceleração completa, aplicar ajuste final ultra preciso
-                    if (!gameState.ajusteFinalAtivo) {
-                        gameState.ajusteFinalAtivo = true;
-                        aplicarAjusteFinalUltraPreciso();
+                    // Desaceleração completa, iniciar overshoot se não estiver ativo
+                    if (!gameState.overshootAtivo && !gameState.ajusteFinalAtivo) {
+                        iniciarOvershoot();
                         return;
+                    } else if (gameState.overshootAtivo) {
+                        // Continuar overshoot
+                        continuarOvershoot();
+                    } else if (gameState.microOscilacaoAtiva) {
+                        // Continuar micro-oscilação
+                        continuarMicroOscilacao();
                     } else {
                         // Finalizar no ângulo exato
                         gameState.anguloAtual = gameState.anguloFinal;
@@ -334,21 +346,8 @@ function iniciarAnimacaoUltraProfissional() {
                         return;
                     }
                 } else {
-                    // Aplicar curva de desaceleração ultra suave com múltiplas fases
-                    let fatorEasing;
-                    
-                    if (progresso < 0.7) {
-                        // Primeira fase: desaceleração suave
-                        fatorEasing = easeOutCubic(progresso / 0.7);
-                    } else if (progresso < 0.9) {
-                        // Segunda fase: desaceleração mais acentuada
-                        const progressoFase2 = (progresso - 0.7) / 0.2;
-                        fatorEasing = 0.7 + (easeOutQuart(progressoFase2) * 0.25);
-                    } else {
-                        // Terceira fase: aproximação final ultra suave
-                        const progressoFase3 = (progresso - 0.9) / 0.1;
-                        fatorEasing = 0.95 + (easeOutExpo(progressoFase3) * 0.05);
-                    }
+                    // Aplicar curva de desaceleração ultra suave combinada
+                    const fatorEasing = easeOutCombined(progresso);
                     
                     // Calcular novo ângulo usando interpolação ultra suave
                     const novoAngulo = gameState.anguloInicialDesaceleracao + 
@@ -357,19 +356,30 @@ function iniciarAnimacaoUltraProfissional() {
                     gameState.anguloAtual = novoAngulo;
                     
                     // Calcular velocidade atual para efeitos visuais
-                    const velocidadeNormalizada = Math.pow(1 - progresso, 2.5);
+                    const velocidadeNormalizada = Math.pow(1 - progresso, 3);
                     gameState.velocidadeAtual = gameState.velocidadeInicial * velocidadeNormalizada;
-                    gameState.momentumAtual = gameState.velocidadeAtual;
                 }
             } else {
-                // Giro normal com resistência natural
-                gameState.momentumAtual *= gameState.resistenciaBase;
-                gameState.velocidadeAtual = Math.max(gameState.momentumAtual, gameState.velocidadeMinima);
-                gameState.anguloAtual += gameState.velocidadeAtual;
+                // Giro normal em velocidade constante com leve variação natural
+                const variacaoNatural = Math.sin(Date.now() * 0.01) * 0.1;
+                gameState.anguloAtual += gameState.velocidadeAtual + variacaoNatural;
             }
             
-            // Aplicar rotação com efeitos visuais avançados
-            aplicarEfeitosVisuaisAvancados();
+            // Aplicar rotação com suavização ultra refinada
+            if (elements.roleta) {
+                elements.roleta.style.transform = `rotate(${gameState.anguloAtual}deg)`;
+                
+                // Adicionar efeito de brilho baseado na velocidade com transição suave
+                const intensidadeBrilho = Math.min(gameState.velocidadeAtual / gameState.velocidadeInicial, 1);
+                const brilho = 1 + intensidadeBrilho * 0.3;
+                const saturacao = 1 + intensidadeBrilho * 0.6;
+                const filtro = `brightness(${brilho}) saturate(${saturacao}) contrast(${1 + intensidadeBrilho * 0.2})`;
+                elements.roleta.style.filter = filtro;
+                
+                // Adicionar sombra dinâmica baseada na velocidade
+                const intensidadeSombra = intensidadeBrilho * 20;
+                elements.roleta.style.boxShadow = `0 0 ${intensidadeSombra}px rgba(255, 215, 0, ${intensidadeBrilho * 0.5})`;
+            }
             
             gameState.animationId = requestAnimationFrame(animar);
         }
@@ -378,132 +388,68 @@ function iniciarAnimacaoUltraProfissional() {
     gameState.animationId = requestAnimationFrame(animar);
 }
 
-// NOVO: Aplicar efeitos visuais avançados durante a rotação
-function aplicarEfeitosVisuaisAvancados() {
-    if (!elements.roleta) return;
+// NOVA: Iniciar efeito de overshoot
+function iniciarOvershoot() {
+    console.log('🎯 Iniciando efeito de overshoot natural...');
     
-    // Aplicar rotação principal
-    elements.roleta.style.transform = `rotate(${gameState.anguloAtual}deg)`;
+    gameState.overshootAtivo = true;
+    gameState.tempoInicioOvershoot = Date.now();
     
-    // Calcular intensidade dos efeitos baseada na velocidade
-    const intensidadeVelocidade = Math.min(gameState.velocidadeAtual / gameState.velocidadeInicial, 1);
+    // Calcular ângulo de overshoot (pequeno excesso)
+    const direcaoOvershoot = Math.random() > 0.5 ? 1 : -1; // Direção aleatória
+    gameState.anguloOvershoot = gameState.anguloFinal + (direcaoOvershoot * gameState.intensidadeOvershoot * 3);
     
-    // Efeito de brilho dinâmico
-    const brilho = 1 + (intensidadeVelocidade * 0.5);
-    const saturacao = 1 + (intensidadeVelocidade * 0.6);
-    const contraste = 1 + (intensidadeVelocidade * 0.3);
-    
-    // Efeito de blur sutil durante alta velocidade
-    const blur = intensidadeVelocidade > 0.7 ? (intensidadeVelocidade - 0.7) * 2 : 0;
-    
-    // Aplicar filtros combinados
-    const filtro = `brightness(${brilho}) saturate(${saturacao}) contrast(${contraste}) blur(${blur}px)`;
-    elements.roleta.style.filter = filtro;
-    
-    // Efeito de sombra dinâmica
-    const intensidadeSombra = intensidadeVelocidade * 20;
-    const corSombra = `rgba(255, 215, 0, ${intensidadeVelocidade * 0.4})`;
-    elements.roleta.style.boxShadow = `0 0 ${intensidadeSombra}px ${corSombra}`;
-    
-    // Animação do ponteiro baseada na velocidade
-    if (elements.roletaPointer) {
-        const escalaPointer = 1 + (intensidadeVelocidade * 0.2);
-        const rotacaoPointer = Math.sin(Date.now() * 0.01) * intensidadeVelocidade * 5;
-        elements.roletaPointer.style.transform = `scale(${escalaPointer}) rotate(${rotacaoPointer}deg)`;
-    }
+    console.log(`📐 Overshoot: ${gameState.anguloFinal}° → ${gameState.anguloOvershoot}°`);
 }
 
-// ULTRA MELHORADO: Aplicar ajuste final para precisão máxima com efeito de mola
-function aplicarAjusteFinalUltraPreciso() {
-    console.log('🎯 Aplicando ajuste final ultra preciso com efeito de mola...');
+// NOVA: Continuar efeito de overshoot
+function continuarOvershoot() {
+    const tempoDecorrido = Date.now() - gameState.tempoInicioOvershoot;
+    const progresso = Math.min(tempoDecorrido / gameState.duracaoOvershoot, 1);
     
-    const diferencaAngular = gameState.anguloFinal - gameState.anguloAtual;
-    const distanciaAjuste = Math.abs(diferencaAngular);
-    
-    console.log(`📐 Diferença angular: ${diferencaAngular.toFixed(2)}°`);
-    
-    if (distanciaAjuste <= gameState.margemErroAngulo) {
-        // Já está próximo o suficiente, aplicar oscilação final
-        if (gameState.oscilacoesFinais) {
-            aplicarOscilacaoFinal();
-        } else {
-            gameState.anguloAtual = gameState.anguloFinal;
-            finalizarGiro();
-        }
+    if (progresso >= 1) {
+        // Overshoot completo, iniciar micro-oscilações
+        gameState.overshootAtivo = false;
+        iniciarMicroOscilacao();
         return;
     }
     
-    // Aplicar micro-ajuste ultra suave
-    const tempoAjuste = Math.min(800, distanciaAjuste * 15); // Máximo 800ms
-    const anguloInicial = gameState.anguloAtual;
-    const tempoInicioAjuste = Date.now();
+    // Calcular posição com overshoot
+    const fatorOvershoot = calcularOvershoot(progresso, gameState.intensidadeOvershoot);
+    const anguloComOvershoot = gameState.anguloFinal + fatorOvershoot;
     
-    function ajustarPrecisaoUltra() {
-        const tempoDecorrido = Date.now() - tempoInicioAjuste;
-        const progressoAjuste = Math.min(tempoDecorrido / tempoAjuste, 1);
-        
-        if (progressoAjuste >= 1) {
-            gameState.anguloAtual = gameState.anguloFinal;
-            
-            // Aplicar oscilação final se habilitada
-            if (gameState.oscilacoesFinais) {
-                aplicarOscilacaoFinal();
-            } else {
-                finalizarGiro();
-            }
-            return;
-        }
-        
-        // Usar easing ultra suave para o ajuste final
-        const fatorAjuste = easeOutExpo(progressoAjuste);
-        gameState.anguloAtual = anguloInicial + (diferencaAngular * fatorAjuste);
-        
-        // Aplicar efeitos visuais durante o ajuste
-        aplicarEfeitosVisuaisAvancados();
-        
-        requestAnimationFrame(ajustarPrecisaoUltra);
-    }
-    
-    requestAnimationFrame(ajustarPrecisaoUltra);
+    gameState.anguloAtual = anguloComOvershoot;
 }
 
-// NOVO: Aplicar oscilação final para efeito de mola realista
-function aplicarOscilacaoFinal() {
-    console.log('🌊 Aplicando oscilação final para efeito de mola...');
+// NOVA: Iniciar micro-oscilações finais
+function iniciarMicroOscilacao() {
+    console.log('🎯 Iniciando micro-oscilações finais...');
     
-    const anguloBase = gameState.anguloFinal;
-    const tempoInicioOscilacao = Date.now();
+    gameState.microOscilacaoAtiva = true;
+    gameState.tempoInicioMicroOscilacao = Date.now();
+}
+
+// NOVA: Continuar micro-oscilações
+function continuarMicroOscilacao() {
+    const tempoDecorrido = Date.now() - gameState.tempoInicioMicroOscilacao;
+    const progresso = Math.min(tempoDecorrido / gameState.duracaoMicroOscilacao, 1);
     
-    function oscilar() {
-        const tempoDecorrido = Date.now() - tempoInicioOscilacao;
-        const progressoOscilacao = Math.min(tempoDecorrido / gameState.tempoOscilacao, 1);
-        
-        if (progressoOscilacao >= 1) {
-            gameState.anguloAtual = anguloBase;
-            finalizarGiro();
-            return;
-        }
-        
-        // Calcular oscilação com amortecimento
-        const fatorAmortecimento = 1 - progressoOscilacao;
-        const anguloOscilacao = Math.sin(progressoOscilacao * Math.PI * gameState.frequenciaOscilacao) * 
-                               gameState.amplitudeOscilacao * fatorAmortecimento;
-        
-        gameState.anguloAtual = anguloBase + anguloOscilacao;
-        
-        // Aplicar rotação com efeito de oscilação
-        if (elements.roleta) {
-            elements.roleta.style.transform = `rotate(${gameState.anguloAtual}deg)`;
-            
-            // Efeito visual sutil durante oscilação
-            const intensidadeOscilacao = fatorAmortecimento * 0.3;
-            elements.roleta.style.filter = `brightness(${1 + intensidadeOscilacao}) saturate(${1 + intensidadeOscilacao})`;
-        }
-        
-        requestAnimationFrame(oscilar);
+    if (progresso >= 1) {
+        // Micro-oscilações completas, finalizar
+        gameState.microOscilacaoAtiva = false;
+        gameState.anguloAtual = gameState.anguloFinal;
+        finalizarGiro();
+        return;
     }
     
-    requestAnimationFrame(oscilar);
+    // Calcular posição com micro-oscilação
+    const microOscilacao = calcularMicroOscilacao(
+        progresso, 
+        gameState.amplitudeMicroOscilacao, 
+        gameState.frequenciaMicroOscilacao
+    );
+    
+    gameState.anguloAtual = gameState.anguloFinal + microOscilacao;
 }
 
 // Parar giro (chamado pelo botão)
@@ -523,14 +469,16 @@ function pararGiro() {
 
     gameState.estadoRoleta = ESTADOS_ROLETA.STOPPING;
     
-    // Atualizar botão com feedback visual melhorado
+    // Atualizar botão com feedback visual ultra melhorado
     if (elements.btnParar) {
         elements.btnParar.disabled = true;
         elements.btnParar.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>PARANDO...</span>';
         elements.btnParar.style.background = 'linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)';
+        elements.btnParar.style.transform = 'scale(0.95)';
+        elements.btnParar.style.transition = 'all 0.3s ease';
     }
     
-    mostrarToast('⏳ Aplicando desaceleração ultra suave profissional...', 'warning');
+    mostrarToast('⏳ Aplicando desaceleração ultra suave com efeitos naturais...', 'warning');
     console.log('✅ Estado alterado para STOPPING - iniciando desaceleração ultra profissional');
 }
 
@@ -546,45 +494,35 @@ function finalizarGiro() {
         gameState.animationId = null;
     }
     
-    // Remover efeitos visuais da roleta
+    // Remover efeitos visuais da roleta com transição suave
     if (elements.roleta) {
         elements.roleta.classList.remove('girando', 'desacelerando');
         elements.roleta.classList.add('parada');
         
-        // Resetar filtros e efeitos
-        elements.roleta.style.filter = '';
-        elements.roleta.style.boxShadow = '';
-        
-        // Aplicar efeito de destaque final
+        // Remover efeitos gradualmente
         setTimeout(() => {
-            elements.roleta.style.filter = 'brightness(1.3) saturate(1.5)';
-            setTimeout(() => {
-                elements.roleta.style.filter = '';
-            }, 500);
+            elements.roleta.style.filter = 'brightness(1) saturate(1) contrast(1)';
+            elements.roleta.style.boxShadow = 'none';
+            elements.roleta.style.transition = 'filter 0.5s ease, box-shadow 0.5s ease';
         }, 100);
     }
     
-    // Resetar ponteiro
-    if (elements.roletaPointer) {
-        elements.roletaPointer.style.transform = '';
-        elements.roletaPointer.style.animation = 'pulsePointer 0.5s ease-in-out 3';
-    }
-    
-    // Determinar prêmio baseado no ângulo final
-    const premio = determinarPremio(gameState.anguloAtual);
+    // Calcular prêmio baseado no ângulo final
+    const premio = calcularPremio(gameState.anguloAtual);
     gameState.saldoAtual += premio.valor;
     
-    console.log(`🎉 Prêmio determinado: ${premio.texto} (Ângulo: ${gameState.anguloAtual.toFixed(2)}°)`);
+    console.log('🎉 Prêmio calculado:', premio);
+    console.log('💰 Novo saldo:', gameState.saldoAtual);
     
     // Resetar botões
-    resetarBotoes();
-    
-    // Mostrar resultado
-    mostrarResultado(premio);
+    setTimeout(() => {
+        resetarBotoes();
+        mostrarResultado(premio);
+    }, 500);
 }
 
-// Determinar prêmio baseado no ângulo final
-function determinarPremio(anguloFinal) {
+// Calcular prêmio baseado no ângulo final
+function calcularPremio(anguloFinal) {
     // Normalizar ângulo para 0-360
     const anguloNormalizado = anguloFinal % 360;
     
@@ -596,7 +534,7 @@ function determinarPremio(anguloFinal) {
         }
     }
     
-    // Fallback para o último setor se houver problemas de arredondamento
+    // Fallback para o último setor (315-360°)
     return setoresRoleta[setoresRoleta.length - 1].premio;
 }
 
@@ -604,7 +542,7 @@ function determinarPremio(anguloFinal) {
 function mostrarResultado(premio) {
     console.log('🎊 Mostrando resultado:', premio);
     
-    // Atualizar modal com informações do prêmio
+    // Atualizar elementos do modal
     if (elements.premioValor) {
         elements.premioValor.textContent = premio.texto;
     }
@@ -626,6 +564,10 @@ function mostrarResultado(premio) {
     if (premio.valor > 0) {
         mostrarToast(`🎉 Parabéns! Você ganhou ${premio.texto}!`, 'success');
         criarConfetes();
+        // Adicionar vibração sutil se suportado
+        if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+        }
     } else {
         mostrarToast('😔 Que pena! Tente novamente!', 'error');
     }
@@ -641,6 +583,8 @@ function resetarBotoes() {
         elements.btnParar.disabled = false;
         elements.btnParar.innerHTML = '<i class="fas fa-stop"></i><span>PARAR</span>';
         elements.btnParar.style.background = '';
+        elements.btnParar.style.transform = '';
+        elements.btnParar.style.transition = '';
     }
     
     gameState.estadoRoleta = ESTADOS_ROLETA.IDLE;
@@ -729,17 +673,26 @@ function mostrarToast(mensagem, tipo = 'info') {
     }
 }
 
-// Criar efeito de confetes
+// Criar efeito de confetes melhorado
 function criarConfetes() {
     const container = document.querySelector('.confetti-container');
     if (!container) return;
     
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 60; i++) {
         const confete = document.createElement('div');
         confete.className = 'confetti';
         confete.style.left = Math.random() * 100 + '%';
         confete.style.animationDelay = Math.random() * 3 + 's';
-        confete.style.backgroundColor = ['#ffd700', '#ff6b6b', '#4ecdc4', '#45b7d1'][Math.floor(Math.random() * 4)];
+        confete.style.animationDuration = (2 + Math.random() * 2) + 's';
+        
+        // Cores mais vibrantes
+        const cores = ['#ffd700', '#ff6b6b', '#4ecdc4', '#45b7d1', '#ff9ff3', '#54a0ff'];
+        confete.style.backgroundColor = cores[Math.floor(Math.random() * cores.length)];
+        
+        // Tamanhos variados
+        const tamanho = 8 + Math.random() * 6;
+        confete.style.width = tamanho + 'px';
+        confete.style.height = tamanho + 'px';
         
         container.appendChild(confete);
         
@@ -748,16 +701,16 @@ function criarConfetes() {
             if (confete.parentNode) {
                 confete.parentNode.removeChild(confete);
             }
-        }, 3000);
+        }, 4000);
     }
 }
 
-// Adicionar CSS para animações ultra profissionais
+// Adicionar CSS para animações ultra melhoradas
 const style = document.createElement('style');
 style.textContent = `
     @keyframes pulsePointer {
         0%, 100% { transform: scale(1) rotate(0deg); }
-        50% { transform: scale(1.3) rotate(8deg); }
+        50% { transform: scale(1.1) rotate(3deg); }
     }
     
     .confetti {
@@ -766,6 +719,7 @@ style.textContent = `
         height: 10px;
         top: -10px;
         animation: confettiFall 3s linear forwards;
+        border-radius: 2px;
     }
     
     @keyframes confettiFall {
@@ -776,15 +730,16 @@ style.textContent = `
     }
     
     .toast {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(20px);
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(25px);
+        border-radius: 15px;
+        padding: 1.2rem 1.8rem;
         margin-bottom: 1rem;
         border-left: 4px solid;
         transform: translateX(100%);
-        transition: all 0.3s ease;
-        max-width: 400px;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 450px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     }
     
     .toast.show {
@@ -810,33 +765,33 @@ style.textContent = `
         font-size: 1.2rem;
         cursor: pointer;
         padding: 0;
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
+        border-radius: 50%;
+        transition: background-color 0.2s ease;
     }
     
-    /* Efeitos visuais ultra profissionais para a roleta */
+    .toast-close:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Animações para a roleta */
     .roleta.girando {
-        transition: filter 0.3s ease;
+        transition: none;
     }
     
     .roleta.desacelerando {
-        transition: filter 0.5s ease, box-shadow 0.5s ease;
+        transition: filter 0.3s ease, box-shadow 0.3s ease;
     }
     
     .roleta.parada {
-        transition: all 0.3s ease;
-    }
-    
-    /* Animação suave para mudanças de estado */
-    .roleta {
-        transition: transform 0.1s linear;
-        will-change: transform;
+        transition: all 0.5s ease;
     }
 `;
 document.head.appendChild(style);
 
-console.log('🎰 RoletaWin - Sistema ultra profissional carregado com sucesso!');
+console.log('🎰 RoletaWin - Script profissional ULTRA melhorado carregado com sucesso!');
 
