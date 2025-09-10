@@ -475,4 +475,371 @@ function iniciarGiro() {
     
     // Habilitar botão parar
     setTimeout(() => {
-        if (gameState.
+        if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING) {
+            elements.btnParar.disabled = false;
+            elements.btnParar.innerHTML = 	
+<i class=\"fas fa-stop\"></i><span>PARAR</span>	
+;
+            mostrarToast("✋ Agora você pode parar a roleta!", "success");
+        }
+    }, gameState.tempoMinimoGiro);
+    
+    // Auto-parar após 8 segundos
+    gameState.autoStopTimeout = setTimeout(() => {
+        if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING) {
+            pararGiro();
+        }
+    }, 8000);
+}
+
+// Parar giro
+function pararGiro() {
+    console.log("🛑 Iniciando parada Spring Physics otimizada...");
+    
+    if (gameState.estadoRoleta !== ESTADOS_ROLETA.SPINNING) {
+        return;
+    }
+    
+    if (gameState.autoStopTimeout) {
+        clearTimeout(gameState.autoStopTimeout);
+        gameState.autoStopTimeout = null;
+    }
+    
+    gameState.estadoRoleta = ESTADOS_ROLETA.STOPPING;
+    
+    // Atualizar sistema Spring
+    const spring = gameState.springSystem;
+    spring.girando = false;
+    spring.desacelerando = true;
+    
+    // Feedback visual
+    if (elements.btnParar) {
+        elements.btnParar.disabled = true;
+        elements.btnParar.innerHTML = 	
+<i class=\"fas fa-spinner fa-spin\"></i><span>PARANDO...</span>	
+;
+        elements.btnParar.style.background = "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)";
+    }
+    
+    if (elements.roleta) {
+        elements.roleta.classList.remove("girando");
+        elements.roleta.classList.add("desacelerando");
+    }
+    
+    mostrarToast("🌸 Aplicando desaceleração Spring Physics otimizada...", "warning");
+}
+
+// Finalizar giro
+function finalizarGiro() {
+    console.log("🏁 Finalizando giro Spring Physics otimizado...");
+    
+    gameState.estadoRoleta = ESTADOS_ROLETA.STOPPED;
+    
+    if (gameState.animationId) {
+        cancelAnimationFrame(gameState.animationId);
+        gameState.animationId = null;
+    }
+    
+    // Remover efeitos visuais suavemente
+    if (elements.roleta) {
+        elements.roleta.classList.remove("girando", "desacelerando");
+        elements.roleta.classList.add("parada");
+        
+        setTimeout(() => {
+            elements.roleta.style.filter = "brightness(1) saturate(1) contrast(1)";
+            elements.roleta.style.boxShadow = "none";
+            elements.roleta.style.transition = "filter 0.4s ease, box-shadow 0.4s ease";
+        }, 150);
+    }
+    
+    // Calcular e mostrar resultado
+    const premio = calcularPremio(gameState.anguloAtual);
+    gameState.saldoAtual += premio.valor;
+    
+    setTimeout(() => {
+        resetarBotoes();
+        mostrarResultado(premio);
+    }, 300);
+}
+
+// Funções auxiliares (mantidas iguais)
+function sortearPremio() {
+    const totalPeso = premiosPossiveis.reduce((total, premio) => total + premio.peso, 0);
+    const random = Math.random() * totalPeso;
+    
+    let acumulado = 0;
+    for (let premio of premiosPossiveis) {
+        acumulado += premio.peso;
+        if (random <= acumulado) {
+            return premio;
+        }
+    }
+    
+    return premiosPossiveis[0];
+}
+
+function encontrarSetorPorPremio(premio) {
+    const setoresValidos = setoresRoleta.filter(setor => 
+        setor.premio.valor === premio.valor
+    );
+    return setoresValidos[Math.floor(Math.random() * setoresValidos.length)];
+}
+
+function calcularAnguloFinal(setor) {
+    const centroSetor = setor.inicio + (setor.fim - setor.inicio) / 2;
+    const variacao = (Math.random() - 0.5) * 3;
+    const anguloNoSetor = Math.max(setor.inicio + 1, Math.min(setor.fim - 1, centroSetor + variacao));
+    const voltasCompletas = 2.8 + Math.random() * 1.5;
+    return (voltasCompletas * 360) + anguloNoSetor;
+}
+
+function calcularPremio(anguloFinal) {
+    const anguloNormalizado = anguloFinal % 360;
+    
+    for (let setor of setoresRoleta) {
+        if (anguloNormalizado >= setor.inicio && anguloNormalizado < setor.fim) {
+            return setor.premio;
+        }
+    }
+    
+    return setoresRoleta[setoresRoleta.length - 1].premio;
+}
+
+function mostrarResultado(premio) {
+    if (elements.premioValor) {
+        elements.premioValor.textContent = premio.texto;
+    }
+    
+    if (elements.novoSaldo) {
+        elements.novoSaldo.textContent = `R$ ${gameState.saldoAtual.toFixed(2)}`;
+    }
+    
+    if (elements.resultadoModal) {
+        elements.resultadoModal.style.display = "flex";
+        elements.resultadoModal.classList.add("show");
+    }
+    
+    atualizarInterface();
+    
+    if (premio.valor > 0) {
+        mostrarToast(`🎉 Parabéns! Você ganhou ${premio.texto}!`, "success");
+        criarConfetes();
+        if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100, 50, 200]);
+        }
+    } else {
+        mostrarToast("😔 Que pena! Tente novamente!", "error");
+    }
+}
+
+function resetarBotoes() {
+    if (elements.btnGirar && elements.btnParar) {
+        elements.btnGirar.classList.remove("hidden");
+        elements.btnParar.classList.add("hidden");
+        elements.btnParar.disabled = false;
+        elements.btnParar.innerHTML = 	
+<i class=\"fas fa-stop\"></i><span>PARAR</span>	
+;
+        elements.btnParar.style.background = "";
+    }
+    
+    gameState.estadoRoleta = ESTADOS_ROLETA.IDLE;
+}
+
+function fecharModal() {
+    if (elements.resultadoModal) {
+        elements.resultadoModal.classList.remove("show");
+        setTimeout(() => {
+            elements.resultadoModal.style.display = "none";
+        }, 300);
+    }
+}
+
+function atualizarInterface() {
+    if (elements.girosCount) {
+        elements.girosCount.textContent = gameState.girosRestantes;
+    }
+    
+    if (elements.saldoAtual) {
+        elements.saldoAtual.textContent = gameState.saldoAtual.toFixed(2);
+    }
+    
+    const girosInfo = document.getElementById("giros-info");
+    if (girosInfo) {
+        girosInfo.style.display = gameState.girosRestantes > 0 ? "block" : "none";
+    }
+    
+    if (elements.btnGirar) {
+        if (gameState.girosRestantes <= 0) {
+            elements.btnGirar.disabled = true;
+            elements.btnGirar.innerHTML = 	
+<i class=\"fas fa-times\"></i><span>SEM GIROS</span>	
+;
+            elements.btnGirar.style.opacity = "0.5";
+        } else {
+            elements.btnGirar.disabled = false;
+            elements.btnGirar.innerHTML = 	
+<i class=\"fas fa-play\"></i><span>GIRAR</span>	
+;
+            elements.btnGirar.style.opacity = "1";
+        }
+    }
+}
+
+function mostrarToast(mensagem, tipo = "info") {
+    if (!elements.toastContainer) return;
+    
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${tipo}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <span>${mensagem}</span>
+            <button class="toast-close">&times;</button>
+        </div>
+    `;
+    
+    elements.toastContainer.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add("show"), 100);
+    
+    setTimeout(() => {
+        toast.classList.remove("show");
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
+    
+    const closeBtn = toast.querySelector(".toast-close");
+    if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+            toast.classList.remove("show");
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        });
+    }
+}
+
+function criarConfetes() {
+    const container = document.querySelector(".confetti-container");
+    if (!container) return;
+    
+    for (let i = 0; i < 40; i++) {
+        const confete = document.createElement("div");
+        confete.className = "confetti";
+        confete.style.left = Math.random() * 100 + "%";
+        confete.style.animationDelay = Math.random() * 2.5 + "s";
+        confete.style.animationDuration = (1.8 + Math.random() * 1.5) + "s";
+        
+        const cores = ["#ffd700", "#ff6b6b", "#4ecdc4", "#45b7d1", "#ff9ff3", "#54a0ff"];
+        confete.style.backgroundColor = cores[Math.floor(Math.random() * cores.length)];
+        
+        const tamanho = 4 + Math.random() * 4;
+        confete.style.width = tamanho + "px";
+        confete.style.height = tamanho + "px";
+        
+        container.appendChild(confete);
+        
+        setTimeout(() => {
+            if (confete.parentNode) {
+                confete.parentNode.removeChild(confete);
+            }
+        }, 3500);
+    }
+}
+
+// CSS para animações Spring Physics otimizadas
+const style = document.createElement("style");
+style.textContent = `
+    .roleta {
+        will-change: transform;
+        backface-visibility: hidden;
+        transform-style: preserve-3d;
+    }
+    
+    .roleta.girando {
+        transition: none;
+    }
+    
+    .roleta.desacelerando {
+        transition: filter 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .roleta.parada {
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .confetti {
+        position: absolute;
+        border-radius: 1px;
+        top: -6px;
+        animation: confettiFall linear forwards;
+        pointer-events: none;
+    }
+    
+    @keyframes confettiFall {
+        to {
+            transform: translateY(100vh) rotate(720deg) scale(0.1);
+            opacity: 0;
+        }
+    }
+    
+    .toast {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(18px);
+        border-radius: 10px;
+        padding: 0.9rem 1.3rem;
+        margin-bottom: 0.8rem;
+        border-left: 3px solid;
+        transform: translateX(100%);
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 380px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    
+    .toast.show {
+        transform: translateX(0);
+    }
+    
+    .toast-info { border-left-color: #45b7d1; }
+    .toast-success { border-left-color: #00ff88; }
+    .toast-warning { border-left-color: #ffd700; }
+    .toast-error { border-left-color: #ff6b6b; }
+    
+    .toast-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.8rem;
+    }
+    
+    .toast-close {
+        background: none;
+        border: none;
+        color: #ffffff;
+        font-size: 1rem;
+        cursor: pointer;
+        padding: 0;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.15s ease;
+    }
+    
+    .toast-close:hover {
+        background-color: rgba(255, 255, 255, 0.12);
+        transform: scale(1.02);
+    }
+`;
+document.head.appendChild(style);
+
+console.log("🌸 RoletaWin - Sistema Spring Physics Otimizado carregado com sucesso!");
+
+
