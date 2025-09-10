@@ -26,17 +26,18 @@ let gameState = {
     // Física realista de cassino profissional
     fisica: {
         // Parâmetros calibrados como cassinos reais
-        velocidadeInicial: 15,
+        velocidadeInicial: 12,
         velocidadeAtual: 0,
         anguloAtual: 0,
+        anguloInicial: 0, // Ângulo quando começou o giro
         
         // Desaceleração linear constante (como roletas físicas)
         desaceleracao: {
             ativa: false,
-            fatorConstante: 0.98,  // Desaceleração exponencial suave
+            fatorConstante: 0.985,  // Desaceleração exponencial mais suave
             tempoInicio: 0,
-            duracaoTotal: 4500,    // 4.5 segundos para parar
-            velocidadeFinal: 0.1
+            duracaoTotal: 3500,    // 3.5 segundos para desacelerar
+            velocidadeFinal: 0.3
         },
         
         // Aproximação final precisa
@@ -45,8 +46,9 @@ let gameState = {
             anguloInicial: 0,
             anguloAlvo: 0,
             tempoInicio: 0,
-            duracao: 1500,
-            finalizada: false
+            duracao: 800,
+            finalizada: false,
+            distanciaOriginal: 0
         }
     },
     
@@ -99,18 +101,41 @@ function calcularDesaceleracaoRealista(tempoDecorrido, duracaoTotal) {
     const progresso = Math.min(tempoDecorrido / duracaoTotal, 1);
     
     // Curva exponencial suave que imita roletas físicas
-    const fatorExponencial = Math.pow(0.02, progresso);
+    const fatorExponencial = Math.pow(0.05, progresso);
     
-    // Adiciona uma pequena curva no final para suavidade
-    const ajusteFinal = progresso > 0.85 ? Math.pow(1 - progresso, 2) : 1;
+    // Adiciona uma pequena curva no final para suavidade extra
+    const ajusteFinal = progresso > 0.8 ? Math.pow(1 - progresso, 1.5) : 1;
     
-    return fatorExponencial * ajusteFinal;
+    return Math.max(fatorExponencial * ajusteFinal, 0.01);
 }
 
-// Função de easing suave para aproximação final
+// Função de easing suave para aproximação final (sem overshooting)
 function easingApproximacaoFinal(t) {
-    // Curva cúbica suave para o posicionamento final
-    return t * t * (3 - 2 * t);
+    // Curva que garante movimento sempre na direção correta
+    return Math.sin(t * Math.PI / 2); // Sine ease-out
+}
+
+// Normalizar ângulo para 0-360
+function normalizarAngulo(angulo) {
+    angulo = angulo % 360;
+    return angulo < 0 ? angulo + 360 : angulo;
+}
+
+// Calcular menor distância angular
+function calcularDistanciaAngular(anguloAtual, anguloAlvo) {
+    anguloAtual = normalizarAngulo(anguloAtual);
+    anguloAlvo = normalizarAngulo(anguloAlvo);
+    
+    let distancia = anguloAlvo - anguloAtual;
+    
+    // Encontrar o caminho mais curto
+    if (distancia > 180) {
+        distancia -= 360;
+    } else if (distancia < -180) {
+        distancia += 360;
+    }
+    
+    return distancia;
 }
 
 // Sistema principal de física
@@ -119,7 +144,8 @@ function atualizarFisicaRealista(deltaTime) {
     
     if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING) {
         // Rotação constante durante o giro inicial
-        gameState.anguloAtual += fisica.velocidadeAtual * deltaTime * 60;
+        const incremento = fisica.velocidadeAtual * deltaTime * 60;
+        gameState.anguloAtual += incremento;
         
     } else if (gameState.estadoRoleta === ESTADOS_ROLETA.SLOWING_DOWN) {
         // Desaceleração realista e constante
@@ -130,7 +156,8 @@ function atualizarFisicaRealista(deltaTime) {
         );
         
         fisica.velocidadeAtual = fisica.velocidadeInicial * fatorDesaceleracao;
-        gameState.anguloAtual += fisica.velocidadeAtual * deltaTime * 60;
+        const incremento = fisica.velocidadeAtual * deltaTime * 60;
+        gameState.anguloAtual += incremento;
         
         // Verificar se deve iniciar aproximação final
         if (fisica.velocidadeAtual <= fisica.desaceleracao.velocidadeFinal) {
@@ -152,18 +179,18 @@ function iniciarAproximacaoFinal() {
     
     aproximacao.ativa = true;
     aproximacao.anguloInicial = gameState.anguloAtual;
-    aproximacao.anguloAlvo = gameState.anguloFinal;
     aproximacao.tempoInicio = Date.now();
     aproximacao.finalizada = false;
     
-    // Calcular o caminho mais curto para o alvo
-    let distancia = aproximacao.anguloAlvo - aproximacao.anguloInicial;
-    while (distancia > 180) distancia -= 360;
-    while (distancia < -180) distancia += 360;
+    // Calcular distância mais curta para o alvo
+    aproximacao.distanciaOriginal = calcularDistanciaAngular(
+        gameState.anguloAtual, 
+        gameState.anguloFinal
+    );
     
-    aproximacao.anguloAlvo = aproximacao.anguloInicial + distancia;
+    aproximacao.anguloAlvo = aproximacao.anguloInicial + aproximacao.distanciaOriginal;
     
-    console.log(`📐 Aproximação: ${aproximacao.anguloInicial.toFixed(1)}° → ${aproximacao.anguloAlvo.toFixed(1)}°`);
+    console.log(`📐 Aproximação: ${aproximacao.anguloInicial.toFixed(1)}° → ${aproximacao.anguloAlvo.toFixed(1)}° (${aproximacao.distanciaOriginal.toFixed(1)}°)`);
     
     // Atualizar interface
     mostrarToast('🎯 Finalizando posicionamento...', 'info');
@@ -180,21 +207,19 @@ function processarAproximacaoFinal() {
     
     if (progresso >= 1) {
         // Aproximação concluída
-        gameState.anguloAtual = aproximacao.anguloAlvo;
+        gameState.anguloAtual = gameState.anguloFinal;
         aproximacao.ativa = false;
         aproximacao.finalizada = true;
         finalizarGiro();
         return;
     }
     
-    // Aplicar movimento suave até o alvo
-    const easingValue = easingApproximacaoFinal(progresso);
-    const distanciaTotal = aproximacao.anguloAlvo - aproximacao.anguloInicial;
-    
-    gameState.anguloAtual = aproximacao.anguloInicial + (distanciaTotal * easingValue);
+    // Aplicar movimento suave até o alvo (sem overshooting)
+    const easingValue = easingAproximacaoFinal(progresso);
+    gameState.anguloAtual = aproximacao.anguloInicial + (aproximacao.distanciaOriginal * easingValue);
     
     // Atualizar velocidade visual para efeitos
-    gameState.velocidadeAtual = (1 - easingValue) * 2;
+    gameState.velocidadeAtual = (1 - easingValue) * 1.5;
 }
 
 // ===== SISTEMA DE ANIMAÇÃO PROFISSIONAL =====
@@ -234,7 +259,8 @@ function aplicarRotacao() {
     if (!elements.roleta) return;
     
     // Usar transform3d para máxima performance
-    elements.roleta.style.transform = `translate3d(0, 0, 0) rotate(${gameState.anguloAtual}deg)`;
+    const anguloNormalizado = normalizarAngulo(gameState.anguloAtual);
+    elements.roleta.style.transform = `translate3d(0, 0, 0) rotate(${anguloNormalizado}deg)`;
 }
 
 // Atualizar efeitos visuais sutis
@@ -248,13 +274,13 @@ function atualizarEfeitosVisuais() {
     // Efeitos sutis baseados na velocidade
     const brilho = 1 + velocidadeNormalizada * 0.1;
     const saturacao = 1 + velocidadeNormalizada * 0.15;
-    const blur = velocidadeNormalizada * 0.8;
+    const blur = velocidadeNormalizada * 0.6;
     
     elements.roleta.style.filter = `brightness(${brilho}) saturate(${saturacao}) blur(${blur}px)`;
     
     // Sombra sutil durante rotação rápida
-    if (velocidadeNormalizada > 0.3) {
-        const intensidadeSombra = velocidadeNormalizada * 8;
+    if (velocidadeNormalizada > 0.2) {
+        const intensidadeSombra = velocidadeNormalizada * 6;
         elements.roleta.style.boxShadow = `0 0 ${intensidadeSombra}px rgba(255, 215, 0, 0.3)`;
     } else {
         elements.roleta.style.boxShadow = 'none';
@@ -319,15 +345,19 @@ function iniciarGiro() {
     
     console.log('🎲 Iniciando giro profissional...');
     
-    // Sortear resultado
+    // Sortear resultado ANTES de calcular o ângulo
     gameState.premioSorteado = sortearPremio();
-    gameState.anguloFinal = calcularAnguloFinal(gameState.premioSorteado);
+    
+    // Armazenar ângulo inicial
+    gameState.fisica.anguloInicial = gameState.anguloAtual;
+    
+    // Calcular ângulo final baseado no prêmio sorteado
+    gameState.anguloFinal = calcularAnguloFinalCorrigido(gameState.premioSorteado);
     
     // Configurar estado inicial
     gameState.estadoRoleta = ESTADOS_ROLETA.SPINNING;
     gameState.girosRestantes--;
     gameState.tempoInicioGiro = Date.now();
-    gameState.anguloAtual = 0;
     gameState.velocidadeAtual = gameState.fisica.velocidadeInicial;
     
     // Resetar física
@@ -350,12 +380,12 @@ function iniciarGiro() {
         habilitarBotaoParar();
     }, gameState.tempoMinimoGiro);
     
-    // Auto-stop após 12 segundos
+    // Auto-stop após 10 segundos
     gameState.autoStopTimeout = setTimeout(() => {
         if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING) {
             pararGiro();
         }
-    }, 12000);
+    }, 10000);
 }
 
 // Parar giro
@@ -415,7 +445,7 @@ function finalizarGiro() {
     }, 600);
 }
 
-// ===== FUNÇÕES AUXILIARES =====
+// ===== FUNÇÕES AUXILIARES CORRIGIDAS =====
 
 function sortearPremio() {
     const totalPeso = premiosPossiveis.reduce((total, premio) => total + premio.peso, 0);
@@ -432,7 +462,7 @@ function sortearPremio() {
     return premiosPossiveis[0];
 }
 
-function calcularAnguloFinal(premio) {
+function calcularAnguloFinalCorrigido(premio) {
     // Encontrar setores válidos para o prêmio
     const setoresValidos = setoresRoleta.filter(setor => 
         setor.premio.valor === premio.valor
@@ -443,20 +473,25 @@ function calcularAnguloFinal(premio) {
     
     // Calcular ângulo no centro do setor com pequena variação
     const centroSetor = setorEscolhido.inicio + (setorEscolhido.fim - setorEscolhido.inicio) / 2;
-    const variacao = (Math.random() - 0.5) * 15; // Variação de ±7.5°
+    const variacao = (Math.random() - 0.5) * 10; // Variação de ±5°
     const anguloNoSetor = Math.max(
-        setorEscolhido.inicio + 3, 
-        Math.min(setorEscolhido.fim - 3, centroSetor + variacao)
+        setorEscolhido.inicio + 2, 
+        Math.min(setorEscolhido.fim - 2, centroSetor + variacao)
     );
     
-    // Adicionar voltas completas (3-5 voltas)
-    const voltasCompletas = 3 + Math.random() * 2;
+    // Adicionar voltas completas (2-4 voltas para movimento mais suave)
+    const voltasCompletas = 2 + Math.random() * 2;
+    const anguloComVoltas = (voltasCompletas * 360) + anguloNoSetor;
     
-    return (voltasCompletas * 360) + anguloNoSetor;
+    // Garantir que o movimento seja sempre progressivo
+    const anguloAtualNormalizado = normalizarAngulo(gameState.anguloAtual);
+    const anguloBaseNecessario = Math.ceil((gameState.anguloAtual + 720) / 360) * 360; // Mínimo 2 voltas
+    
+    return anguloBaseNecessario + anguloNoSetor;
 }
 
 function calcularPremio(anguloFinal) {
-    const anguloNormalizado = anguloFinal % 360;
+    const anguloNormalizado = normalizarAngulo(anguloFinal);
     
     for (let setor of setoresRoleta) {
         if (anguloNormalizado >= setor.inicio && anguloNormalizado < setor.fim) {
@@ -501,6 +536,11 @@ function resetarInterface() {
         elements.btnParar.classList.add('hidden');
         elements.btnParar.disabled = false;
         elements.btnParar.innerHTML = '<i class="fas fa-stop"></i> PARAR';
+    }
+    
+    // Remover transições temporárias
+    if (elements.roleta) {
+        elements.roleta.style.transition = 'none';
     }
     
     gameState.estadoRoleta = ESTADOS_ROLETA.IDLE;
@@ -832,166 +872,6 @@ function verificarCompatibilidade() {
 // Executar verificação de compatibilidade
 verificarCompatibilidade();
 
-// ===== SISTEMA DE PERSISTÊNCIA LOCAL (OPCIONAL) =====
-
-// Salvar estado do jogo
-function salvarEstado() {
-    try {
-        const estado = {
-            girosRestantes: gameState.girosRestantes,
-            saldoAtual: gameState.saldoAtual,
-            timestamp: Date.now()
-        };
-        // Nota: localStorage não funciona no ambiente Claude.ai
-        // Em um ambiente real, descomente a linha abaixo:
-        // localStorage.setItem('roletaGameState', JSON.stringify(estado));
-        console.log('💾 Estado salvo:', estado);
-    } catch (error) {
-        console.warn('⚠️ Não foi possível salvar o estado:', error.message);
-    }
-}
-
-// Carregar estado do jogo
-function carregarEstado() {
-    try {
-        // Nota: localStorage não funciona no ambiente Claude.ai
-        // Em um ambiente real, descomente as linhas abaixo:
-        /*
-        const estadoSalvo = localStorage.getItem('roletaGameState');
-        if (estadoSalvo) {
-            const estado = JSON.parse(estadoSalvo);
-            const tempoDecorrido = Date.now() - estado.timestamp;
-            
-            // Se foi salvo há menos de 24 horas, restaurar
-            if (tempoDecorrido < 24 * 60 * 60 * 1000) {
-                gameState.girosRestantes = estado.girosRestantes;
-                gameState.saldoAtual = estado.saldoAtual;
-                console.log('📂 Estado carregado:', estado);
-                atualizarInterface();
-            }
-        }
-        */
-    } catch (error) {
-        console.warn('⚠️ Não foi possível carregar o estado:', error.message);
-    }
-}
-
-// Salvar estado automaticamente quando necessário
-function configurarAutoSave() {
-    // Salvar ao ganhar prêmio
-    const originalMostrarResultado = mostrarResultado;
-    mostrarResultado = function(premio) {
-        originalMostrarResultado(premio);
-        salvarEstado();
-    };
-    
-    // Salvar ao usar giro
-    const originalIniciarGiro = iniciarGiro;
-    iniciarGiro = function() {
-        originalIniciarGiro();
-        if (gameState.estadoRoleta === ESTADOS_ROLETA.SPINNING) {
-            salvarEstado();
-        }
-    };
-}
-
-// Ativar auto-save (desabilitado por padrão no Claude.ai)
-// configurarAutoSave();
-
-// ===== SISTEMA DE EVENTOS PERSONALIZADOS =====
-
-// Eventos customizados para integração externa
-function dispararEvento(tipo, dados = {}) {
-    const evento = new CustomEvent(`roleta:${tipo}`, {
-        detail: {
-            ...dados,
-            timestamp: Date.now(),
-            gameState: {
-                estadoRoleta: gameState.estadoRoleta,
-                girosRestantes: gameState.girosRestantes,
-                saldoAtual: gameState.saldoAtual
-            }
-        }
-    });
-    
-    document.dispatchEvent(evento);
-}
-
-// Integrar eventos no sistema existente
-const originalFinalizarGiro = finalizarGiro;
-finalizarGiro = function() {
-    const premio = calcularPremio(gameState.anguloAtual);
-    dispararEvento('giroFinalizado', { premio });
-    originalFinalizarGiro();
-};
-
-// Exemplo de como escutar os eventos:
-/*
-document.addEventListener('roleta:giroFinalizado', (event) => {
-    console.log('Evento de giro finalizado:', event.detail);
-    // Aqui você pode integrar com sistemas externos
-});
-*/
-
-// ===== OTIMIZAÇÕES DE PERFORMANCE AVANÇADAS =====
-
-// Pool de objetos para reutilização (evita garbage collection)
-const objetoPool = {
-    elementos: [],
-    obter() {
-        return this.elementos.pop() || document.createElement('div');
-    },
-    retornar(elemento) {
-        if (elemento && this.elementos.length < 50) { // Limite do pool
-            elemento.className = '';
-            elemento.style.cssText = '';
-            elemento.innerHTML = '';
-            this.elementos.push(elemento);
-        }
-    }
-};
-
-// Função otimizada para criação de confetes
-function criarConfetesOtimizado() {
-    const container = document.body;
-    const fragment = document.createDocumentFragment();
-    
-    for (let i = 0; i < 50; i++) {
-        const confete = objetoPool.obter();
-        confete.className = 'confetti';
-        
-        // Aplicar estilos de uma vez
-        confete.style.cssText = `
-            position: fixed;
-            left: ${Math.random() * 100}%;
-            top: -10px;
-            z-index: 9999;
-            pointer-events: none;
-            background-color: ${['#ffd700', '#ff6b6b', '#4ecdc4', '#45b7d1', '#ff9ff3', '#54a0ff'][Math.floor(Math.random() * 6)]};
-            width: ${4 + Math.random() * 6}px;
-            height: ${4 + Math.random() * 6}px;
-            border-radius: 2px;
-            animation: confettiFall ${2.5 + Math.random() * 1.5}s linear forwards;
-            animation-delay: ${Math.random() * 2}s;
-        `;
-        
-        fragment.appendChild(confete);
-        
-        // Cleanup otimizado
-        setTimeout(() => {
-            if (confete.parentNode) {
-                confete.parentNode.removeChild(confete);
-                objetoPool.retornar(confete);
-            }
-        }, 5000);
-    }
-    
-    container.appendChild(fragment);
-}
-
-// Substituir função original por versão otimizada
-criarConfetes = criarConfetesOtimizado;
-
 // ===== SISTEMA DE VALIDAÇÃO E INTEGRIDADE =====
 
 // Validar integridade do jogo
@@ -1120,9 +1000,6 @@ function limpezaGeral() {
         gameState.animationId = null;
     }
     
-    // Limpar pool de objetos
-    objetoPool.elementos.length = 0;
-    
     console.log('🧹 Limpeza geral concluída');
 }
 
@@ -1138,20 +1015,15 @@ setInterval(() => {
             toast.parentNode.removeChild(toast);
         }
     });
-    
-    // Limitar pool de objetos
-    if (objetoPool.elementos.length > 100) {
-        objetoPool.elementos.length = 50;
-    }
 }, 5 * 60 * 1000);
 
 console.log('🎰 Sistema de Roleta Profissional COMPLETAMENTE CARREGADO! 🎰');
 console.log('📋 Funcionalidades ativas:');
-console.log('  ✅ Física realista de cassino');
-console.log('  ✅ Animações ultra suaves');
+console.log('  ✅ Física realista de cassino com parada suave');
+console.log('  ✅ Animações ultra fluidas sem overshooting');
 console.log('  ✅ Sistema de recuperação de erros');
 console.log('  ✅ Otimizações de performance');
 console.log('  ✅ Acessibilidade aprimorada');
-console.log('  ✅ Eventos personalizados');
-console.log('  ✅ Validação de integridade');
+console.log('  ✅ Normalização de ângulos corrigida');
+console.log('  ✅ Aproximação final sem volta indevida');
 console.log('🚀 Pronto para uso profissional!');
